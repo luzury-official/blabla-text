@@ -1,9 +1,11 @@
 from pathlib import Path
 import json
+import shutil
+from huggingface_hub import snapshot_download
 from transformers import pipeline
 import scipy.io.wavfile as wav
 
-def get_config_dir(app_name="BlabBla-text"):
+def get_config_dir(app_name="BlaBla-Text"):
     home = Path.home()
     config_dir = home / f".{app_name.lower()}"
     config_dir.mkdir(parents=True, exist_ok=True)
@@ -63,7 +65,11 @@ def synthesize_speech(text: str, output_path: str, lang: str = "en", model_id: s
     tts = pipeline("text-to-speech", model=target_model)
     result = tts(text)
     
-    wav.write(output_path, result["sampling_rate"], result["audio"])
+    audio_data = result["audio"]
+    if audio_data.ndim > 1:
+        audio_data = audio_data[0]
+    
+    wav.write(output_path, result["sampling_rate"], audio_data)
 
 def get_installed_models():
     cache_dir = Path.home() / ".cache" / "huggingface" / "hub"
@@ -76,3 +82,16 @@ def get_installed_models():
                 installed.append(model_name)
                 
     return installed
+
+def download_model(model_name: str):
+    snapshot_download(repo_id=model_name)
+
+def delete_model(model_name: str):
+    cache_dir = Path.home() / ".cache" / "huggingface" / "hub"
+    folder_name = "models--" + model_name.replace("/", "--")
+    model_path = cache_dir / folder_name
+    
+    if model_path.exists() and model_path.is_dir():
+        shutil.rmtree(model_path)
+        return True
+    return False
