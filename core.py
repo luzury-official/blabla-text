@@ -1,16 +1,14 @@
 from pathlib import Path
 import json
-from model_browser import ModelBrowserWindow
+from transformers import pipeline
+import scipy.io.wavfile as wav
 
-# Get config path
-def get_config_dir(app_name="BlaBlaText"):
+def get_config_dir(app_name="BlabBla-text"):
     home = Path.home()
-
     config_dir = home / f".{app_name.lower()}"
     config_dir.mkdir(parents=True, exist_ok=True)
     return config_dir
 
-# Path of config
 CONFIG_FILE = get_config_dir() / "config.json"
 
 def save_settings(data):
@@ -21,5 +19,60 @@ def load_settings():
     if CONFIG_FILE.exists():
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    return {} # Default setting, if the file is missing
+    return {}
 
+SUPPORTED_LANGUAGES = {
+    "en": "facebook/mms-tts-eng",
+    "ru": "facebook/mms-tts-rus",
+    "uk": "facebook/mms-tts-ukr",
+    "pl": "facebook/mms-tts-pol",
+    "de": "facebook/mms-tts-deu",
+    "fr": "facebook/mms-tts-fra",
+    "es": "facebook/mms-tts-spa",
+    "it": "facebook/mms-tts-ita",
+    "pt": "facebook/mms-tts-por",
+    "zh": "facebook/mms-tts-cmn",
+    "ja": "facebook/mms-tts-jpn",
+    "ko": "facebook/mms-tts-kor",
+    "ar": "facebook/mms-tts-ara",
+    "hi": "facebook/mms-tts-hin",
+    "tr": "facebook/mms-tts-tur",
+    "nl": "facebook/mms-tts-nld",
+    "sv": "facebook/mms-tts-swe",
+    "fi": "facebook/mms-tts-fin",
+    "da": "facebook/mms-tts-dan",
+    "no": "facebook/mms-tts-nor",
+    "cs": "facebook/mms-tts-ces",
+    "sk": "facebook/mms-tts-slk",
+    "hu": "facebook/mms-tts-hun",
+    "ro": "facebook/mms-tts-ron",
+    "bg": "facebook/mms-tts-bul",
+    "el": "facebook/mms-tts-ell",
+    "he": "facebook/mms-tts-heb",
+    "th": "facebook/mms-tts-tha",
+    "vi": "facebook/mms-tts-vie",
+    "id": "facebook/mms-tts-ind"
+}
+
+def synthesize_speech(text: str, output_path: str, lang: str = "en", model_id: str = None):
+    target_model = model_id if model_id else SUPPORTED_LANGUAGES.get(lang.lower())
+    
+    if not target_model:
+        raise ValueError(f"Unsupported language code '{lang}'.")
+        
+    tts = pipeline("text-to-speech", model=target_model)
+    result = tts(text)
+    
+    wav.write(output_path, result["sampling_rate"], result["audio"])
+
+def get_installed_models():
+    cache_dir = Path.home() / ".cache" / "huggingface" / "hub"
+    installed = []
+    
+    if cache_dir.exists():
+        for item in cache_dir.iterdir():
+            if item.is_dir() and item.name.startswith("models--"):
+                model_name = item.name.replace("models--", "").replace("--", "/")
+                installed.append(model_name)
+                
+    return installed
