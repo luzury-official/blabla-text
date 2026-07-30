@@ -208,7 +208,7 @@ def manage_models():
                 title="Select model to delete",
                 menu_cursor="> ",
                 menu_cursor_style=("fg_red", "bold"),
-                menu_highlight_style=("bg_red", "fg_white")
+                menu_highlight_style=("bg_red", "fg_gray")
             )
             del_idx = del_menu.show()
 

@@ -61,7 +61,14 @@ def synthesize_speech(text: str, output_path: str, lang: str = "en", model_id: s
     target_model = model_id if model_id else DEFAULT_MODEL
     voice_preset = build_voice_preset(lang, speaker)
 
-    processor = AutoProcessor.from_pretrained(target_model)
+    try:
+        processor = AutoProcessor.from_pretrained(target_model)
+    except Exception:
+        raise ValueError(
+            f"Model '{target_model}' isn't compatible with this app. "
+            f"It needs a model supported by the transformers 'text-to-speech' pipeline "
+            f"(e.g. suno/bark-small, suno/bark) — not a standalone library like Coqui TTS."
+        )
     history_prompt = processor(".", voice_preset=voice_preset)["history_prompt"]
 
     tts = pipeline("text-to-speech", model=target_model)
