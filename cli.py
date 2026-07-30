@@ -4,6 +4,7 @@ from art import tprint
 from rich import print
 from rich.console import Console
 from rich.table import Table
+import os
 
 console = Console()
 
@@ -82,8 +83,33 @@ def synthesize():
                     core.save_settings(full_settings)
 
         elif menu_entry_index == 2:
+            input_options = ["1. Enter text manually", "2. Choose a text file", "3. Back"]
+            input_menu = TerminalMenu(
+                input_options,
+                title="How do you want to input text?",
+                menu_cursor="> ",
+                menu_cursor_style=("fg_cyan", "bold"),
+                menu_highlight_style=("bg_cyan", "fg_black")
+            )
+            
+            input_idx = input_menu.show()
+            
+            if input_idx is None or input_idx == 2:
+                continue
+                
+            text = ""
+            if input_idx == 0:
+                text = input("Enter text to synthesize: ")
+            elif input_idx == 1:
+                file_path = input("Enter path to the text file: ")
+                try:
+                    with open(file_path.strip(), 'r', encoding='utf-8') as f:
+                        text = f.read()
+                except Exception as e:
+                    print(f"\n[bold red]Error reading file:[/bold red] {e}")
+                    input("\nPress Enter to continue...")
+                    continue
 
-            text = input("Enter text to synthesize: ")
             if text.strip():
                 output_file = input("Enter output filename (e.g. result.wav): ")
                 if not output_file.strip():
@@ -97,6 +123,10 @@ def synthesize():
                     print(f"\n[bold red]Error:[/bold red] {e}")
                 
                 input("\nPress Enter to return...")
+            else:
+                print("\n[bold red]Text cannot be empty.[/bold red]")
+                input("\nPress Enter to continue...")
+
 
 def manage_models():
     while True:
@@ -170,6 +200,7 @@ def manage_models():
                 else:
                     print("[bold yellow]Deletion cancelled.[/bold yellow]")
                 input("\nPress Enter to continue...")
+
 
 def main():
     while True:
