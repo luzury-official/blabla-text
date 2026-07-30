@@ -11,17 +11,19 @@ console = Console()
 def synthesize():
     full_settings = core.load_settings()
     settings = full_settings.get("default_synthesize", {
-        "model": "facebook/mms-tts-eng",
-        "lang": "en"
+        "model": core.DEFAULT_MODEL,
+        "lang": "en",
+        "speaker": 6
     })
 
     while True:
         console.clear()
         print("[bold cyan]Settings of synthesize speech:[/bold cyan]")
         print(f"Model: [green]{settings.get('model', 'Not set')}[/green]")
-        print(f"Lang: [green]{settings.get('lang', 'Not set')}[/green]\n\n")
+        print(f"Lang: [green]{settings.get('lang', 'Not set')}[/green]")
+        print(f"Speaker: [green]{settings.get('speaker', 'Not set')}[/green]\n\n")
 
-        options = ["1. Change model", "2. Change language", "3. Start", "4. Back"]
+        options = ["1. Change model", "2. Change language", "3. Change speaker", "4. Start", "5. Back"]
 
         settings_menu = TerminalMenu(
             options,
@@ -33,7 +35,7 @@ def synthesize():
 
         menu_entry_index = settings_menu.show()
 
-        if menu_entry_index is None or menu_entry_index == 3:
+        if menu_entry_index is None or menu_entry_index == 4:
             break
 
         elif menu_entry_index == 0:
@@ -55,7 +57,7 @@ def synthesize():
                     continue
                 elif selected_model == "New model":
                     console.clear()
-                    new_model = input("Enter a link or ID of selected model (e.g. facebook/mms-tts-pol): ")
+                    new_model = input("Enter a link or ID of selected model (e.g. suno/bark-small): ")
                     if new_model.strip():
                         settings["model"] = new_model.strip()
                 else:
@@ -78,11 +80,27 @@ def synthesize():
                 selected_lang = langs[lang_idx]
                 if selected_lang != "Back":
                     settings["lang"] = selected_lang
-                    settings["model"] = core.SUPPORTED_LANGUAGES[selected_lang]
                     full_settings["default_synthesize"] = settings
                     core.save_settings(full_settings)
 
         elif menu_entry_index == 2:
+            speakers = [str(i) for i in range(10)] + ["Back"]
+            speaker_menu = TerminalMenu(
+                speakers,
+                title="Choose speaker (0-9)",
+                menu_cursor="> ",
+                menu_cursor_style=("fg_cyan", "bold"),
+                menu_highlight_style=("bg_cyan", "fg_black")
+            )
+            speaker_idx = speaker_menu.show()
+            if speaker_idx is not None:
+                selected_speaker = speakers[speaker_idx]
+                if selected_speaker != "Back":
+                    settings["speaker"] = int(selected_speaker)
+                    full_settings["default_synthesize"] = settings
+                    core.save_settings(full_settings)
+
+        elif menu_entry_index == 3:
             input_options = ["1. Enter text manually", "2. Choose a text file", "3. Back"]
             input_menu = TerminalMenu(
                 input_options,
@@ -91,12 +109,12 @@ def synthesize():
                 menu_cursor_style=("fg_cyan", "bold"),
                 menu_highlight_style=("bg_cyan", "fg_black")
             )
-            
+
             input_idx = input_menu.show()
-            
+
             if input_idx is None or input_idx == 2:
                 continue
-                
+
             text = ""
             if input_idx == 0:
                 text = input("Enter text to synthesize: ")
@@ -114,14 +132,20 @@ def synthesize():
                 output_file = input("Enter output filename (e.g. result.wav): ")
                 if not output_file.strip():
                     output_file = "result.wav"
-                
+
                 try:
                     print("\n[bold yellow]Synthesizing...[/bold yellow]")
-                    core.synthesize_speech(text.strip(), output_file, settings["lang"], settings["model"])
+                    core.synthesize_speech(
+                        text.strip(),
+                        output_file,
+                        settings["lang"],
+                        settings["model"],
+                        settings.get("speaker", 6)
+                    )
                     print(f"\n[bold green]Success! Audio saved to {output_file}[/bold green]")
                 except Exception as e:
                     print(f"\n[bold red]Error:[/bold red] {e}")
-                
+
                 input("\nPress Enter to return...")
             else:
                 print("\n[bold red]Text cannot be empty.[/bold red]")
@@ -132,16 +156,16 @@ def manage_models():
     while True:
         console.clear()
         models = core.get_installed_models()
-        
+
         table = Table(show_header=True, header_style="bold cyan")
         table.add_column("Installed Models", style="green")
-        
+
         if models:
             for m in models:
                 table.add_row(m)
         else:
             table.add_row("[yellow]No models installed yet.[/yellow]")
-            
+
         console.print(table)
         print("\n")
 
@@ -153,15 +177,15 @@ def manage_models():
             menu_cursor_style=("fg_cyan", "bold"),
             menu_highlight_style=("bg_cyan", "fg_black")
         )
-        
+
         choice = model_menu.show()
-        
+
         if choice is None or choice == 2:
             break
-            
+
         elif choice == 0:
             console.clear()
-            model_id = input("Enter model ID to download (e.g. facebook/mms-tts-pol): ")
+            model_id = input("Enter model ID to download (e.g. suno/bark-small): ")
             if model_id.strip():
                 print(f"\n[bold yellow]Downloading {model_id.strip()}...[/bold yellow]")
                 try:
@@ -170,14 +194,14 @@ def manage_models():
                 except Exception as e:
                     print(f"[bold red]Error downloading model:[/bold red] {e}")
                 input("\nPress Enter to continue...")
-                
+
         elif choice == 1:
             if not models:
                 console.clear()
                 print("[bold red]No models available to delete.[/bold red]")
                 input("\nPress Enter to continue...")
                 continue
-                
+
             console.clear()
             del_menu = TerminalMenu(
                 models + ["Back"],
@@ -187,7 +211,7 @@ def manage_models():
                 menu_highlight_style=("bg_red", "fg_white")
             )
             del_idx = del_menu.show()
-            
+
             if del_idx is not None and del_idx < len(models):
                 selected_model = models[del_idx]
                 console.clear()
@@ -207,7 +231,7 @@ def main():
         console.clear()
         tprint("BlaBla-Text")
         options = ["1. Synthesize speech", "2. My models", "3. Exit"]
-        
+
         terminal_menu = TerminalMenu(
             options,
             title="Choose option",

@@ -2,7 +2,7 @@ from pathlib import Path
 import json
 import shutil
 from huggingface_hub import snapshot_download
-from transformers import pipeline
+from transformers import pipeline, AutoProcessor
 import scipy.io.wavfile as wav
 
 def get_config_dir(app_name="BlaBla-Text"):
@@ -23,64 +23,66 @@ def load_settings():
             return json.load(f)
     return {}
 
-SUPPORTED_LANGUAGES = {
-    "en": "facebook/mms-tts-eng",
-    "ru": "facebook/mms-tts-rus",
-    "uk": "facebook/mms-tts-ukr",
-    "pl": "facebook/mms-tts-pol",
-    "de": "facebook/mms-tts-deu",
-    "fr": "facebook/mms-tts-fra",
-    "es": "facebook/mms-tts-spa",
-    "it": "facebook/mms-tts-ita",
-    "pt": "facebook/mms-tts-por",
-    "zh": "facebook/mms-tts-cmn",
-    "ja": "facebook/mms-tts-jpn",
-    "ko": "facebook/mms-tts-kor",
-    "ar": "facebook/mms-tts-ara",
-    "hi": "facebook/mms-tts-hin",
-    "tr": "facebook/mms-tts-tur",
-    "nl": "facebook/mms-tts-nld",
-    "sv": "facebook/mms-tts-swe",
-    "fi": "facebook/mms-tts-fin",
-    "da": "facebook/mms-tts-dan",
-    "no": "facebook/mms-tts-nor",
-    "cs": "facebook/mms-tts-ces",
-    "sk": "facebook/mms-tts-slk",
-    "hu": "facebook/mms-tts-hun",
-    "ro": "facebook/mms-tts-ron",
-    "bg": "facebook/mms-tts-bul",
-    "el": "facebook/mms-tts-ell",
-    "he": "facebook/mms-tts-heb",
-    "th": "facebook/mms-tts-tha",
-    "vi": "facebook/mms-tts-vie",
-    "id": "facebook/mms-tts-ind"
+# Bark - одна мультиязычная модель, без отдельного чекпоинта на каждый язык.
+# bark-small быстрее и легче, bark (полная версия) звучит качественнее.
+DEFAULT_MODEL = "suno/bark-small"
+
+RECOMMENDED_MODELS = {
+    "bark-small (быстрее, слабее качество)": "suno/bark-small",
+    "bark (медленнее, качество выше)": "suno/bark",
 }
 
-def synthesize_speech(text: str, output_path: str, lang: str = "en", model_id: str = None):
-    target_model = model_id if model_id else SUPPORTED_LANGUAGES.get(lang.lower())
-    
-    if not target_model:
+# Языки, под которые у Bark есть готовые голосовые пресеты (v2/<lang>_speaker_<0-9>)
+SUPPORTED_LANGUAGES = {
+    "en": "English",
+    "de": "German",
+    "es": "Spanish",
+    "fr": "French",
+    "hi": "Hindi",
+    "it": "Italian",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "pl": "Polish",
+    "pt": "Portuguese",
+    "ru": "Russian",
+    "tr": "Turkish",
+    "zh": "Chinese",
+}
+
+def build_voice_preset(lang: str, speaker: int = 6) -> str:
+    lang = lang.lower()
+    if lang not in SUPPORTED_LANGUAGES:
         raise ValueError(f"Unsupported language code '{lang}'.")
-        
+    if not 0 <= speaker <= 9:
+        raise ValueError("Speaker index must be between 0 and 9.")
+    return f"v2/{lang}_speaker_{speaker}"
+
+def synthesize_speech(text: str, output_path: str, lang: str = "en", model_id: str = None, speaker: int = 6):
+    target_model = model_id if model_id else DEFAULT_MODEL
+    voice_preset = build_voice_preset(lang, speaker)
+
+    processor = AutoProcessor.from_pretrained(target_model)
+    history_prompt = processor(".", voice_preset=voice_preset)["history_prompt"]
+
     tts = pipeline("text-to-speech", model=target_model)
-    result = tts(text)
-    
+    result = tts(text, forward_params={"history_prompt": history_prompt, "do_sample": True})
+
     audio_data = result["audio"]
     if audio_data.ndim > 1:
         audio_data = audio_data[0]
-    
+
     wav.write(output_path, result["sampling_rate"], audio_data)
 
 def get_installed_models():
     cache_dir = Path.home() / ".cache" / "huggingface" / "hub"
     installed = []
-    
+
     if cache_dir.exists():
         for item in cache_dir.iterdir():
             if item.is_dir() and item.name.startswith("models--"):
                 model_name = item.name.replace("models--", "").replace("--", "/")
                 installed.append(model_name)
-                
+
     return installed
 
 def download_model(model_name: str):
@@ -90,7 +92,7 @@ def delete_model(model_name: str):
     cache_dir = Path.home() / ".cache" / "huggingface" / "hub"
     folder_name = "models--" + model_name.replace("/", "--")
     model_path = cache_dir / folder_name
-    
+
     if model_path.exists() and model_path.is_dir():
         shutil.rmtree(model_path)
         return True
